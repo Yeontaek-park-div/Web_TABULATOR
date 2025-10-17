@@ -1,0 +1,180 @@
+<!--
+아래는 드롭다운/검증/포매터 모두 제거하고, 엑셀처럼 아무 텍스트나 입력되도록 손본 버전입니다.
+또한 Ctrl+C 로 범위 복사가 바로 되도록(버튼 없이) 테이블 영역에서 keydown을 가로채 table.copyToClipboard("selected") 를 호출합니다.
+(붙여넣기는 셀을 한 번 클릭한 뒤 Ctrl+V 로 됩니다. clipboard: true, clipboardPasteAction:"update" 유지)
+
+코드 안에 자세한 한글 주석을 넣어두었습니다.
+-->
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Tabulator: 엑셀처럼 자유 입력</title>
+
+  <!-- Tabulator CSS -->
+  <link href="https://unpkg.com/tabulator-tables@latest/dist/css/tabulator.min.css" rel="stylesheet">
+
+  <style>
+    /* 데모용 최소 스타일 */
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+    .toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap: wrap; }
+    #table { height: 420px; } /* 고정 높이: 가상 스크롤 활성화 */
+    .note { color:#555; font-size: 13px; margin-top: 8px; }
+    .search { width: 220px; padding: 6px 8px; }
+    button { padding: 6px 10px; border:1px solid #ddd; background:#f7f7f7; border-radius:6px; cursor:pointer; }
+    button:hover { background:#eee; }
+  </style>
+</head>
+<body>
+
+  <h1>Tabulator 바닐라 JS — 엑셀처럼 자유 입력</h1>
+
+  <div class="toolbar">
+    <!-- 검색 입력 (필요 없으면 삭제해도 됨) -->
+    <input id="search" class="search" type="text" placeholder="이름/도시 검색 (실시간 필터)" />
+
+    <!-- 행 조작 -->
+    <button id="add-row">행 추가</button>
+    <button id="del-row">선택 행 삭제</button>
+
+    <!-- 내보내기 -->
+    <button id="export-csv">CSV 내보내기</button>
+  </div>
+
+  <!-- 테이블 컨테이너 -->
+  <div id="table" tabindex="0"></div>
+  <div class="note">
+    Tip: <b>범위 드래그 → Ctrl+C</b>로 복사, 셀을 한 번 클릭하고 <b>Ctrl+V</b>로 붙여넣기.<br/>
+    (이 예시는 버튼 없이도 Ctrl+C가 동작하도록 키 이벤트를 연결했습니다)
+  </div>
+
+  <!-- Tabulator JS -->
+  <script src="https://unpkg.com/tabulator-tables@latest/dist/js/tabulator.min.js"></script>
+
+  <script>
+    // ---------------------------
+    // 데모용 초기 데이터
+    // ---------------------------
+    const tableData = [
+      { _rid: "r1", id:"1", name:"홍길동", age:"29", city:"서울",   join:"2024-10-01", score:"83" },
+      { _rid: "r2", id:"2", name:"김아름", age:"32", city:"부산",   join:"2023-07-12", score:"91" },
+      { _rid: "r3", id:"3", name:"이준호", age:"26", city:"대구",   join:"2025-01-10", score:"75" },
+      { _rid: "r4", id:"4", name:"박지민", age:"41", city:"인천",   join:"2022-03-30", score:"88" },
+    ];
+
+    // ---------------------------
+    // Tabulator 인스턴스 생성
+    // ---------------------------
+    const table = new Tabulator("#table", {
+      // 기본 데이터/키
+      data: tableData,                  // 초기 데이터
+      index: "_rid",              // ✅ 내부용 고유키(화면에 안 보이게 사용)
+
+      // 레이아웃/행높이
+      layout: "fitColumns",             // 컬럼 너비 자동맞춤
+      height: "420px",                  // 가상 스크롤
+      selectable: true,                 // 행 선택 가능
+
+      // 상호작용 기본 옵션
+      movableColumns: true,             // 컬럼 드래그로 순서변경
+      resizableRows: true,              // 행높이 조절
+
+      // 🔒 엑셀처럼 자유 복붙
+      clipboard: true,                  // 클립보드(복붙) 활성화
+      clipboardPasteAction: "update",   // 붙여넣기 시 기존 셀 업데이트
+
+      // ✅ 셀 범위 선택(엑셀식 드래그)
+      selectableRange: true,            // 셀 드래그로 여러 개 선택
+      selectableRangeColumns: true,     // 컬럼(셀) 단위 선택 허용
+      selectableRangeRows: true,        // 행 단위 선택 허용
+      selectableRangeMode: "cell",      // 'cell' 모드에서 다중 셀 선택
+
+      // ✅ 엑셀 느낌: 클릭으로 편집 시작(아무 텍스트 입력 가능)
+      editTriggerEvent: "dblclick",
+
+      // ✅ 컬럼 정의: 전부 editor:"input" 으로 자유 입력
+      //    - 드롭다운/유효성검사/포매터 제거
+      columns: [
+        // (선택) 내부키 컬럼을 숨기고 싶으면 visible:false
+        { title:"_rid", field:"_rid", visible:false }, // ✅ 화면 비표시
+
+        // 화면에 보이는 ID: 자유 입력 가능, 기본값은 빈칸
+        { title:"ID",   field:"id",   width:80,  hozAlign:"left", headerSort:true, editor:"input" },
+        { title:"이름", field:"name",            hozAlign:"left", headerSort:true, editor:"input" },
+        { title:"나이", field:"age",  width:90,  hozAlign:"left", headerSort:true, editor:"input" },
+        { title:"도시", field:"city",            hozAlign:"left", headerSort:true, editor:"input" },
+        { title:"입사일", field:"join",          hozAlign:"left", headerSort:true, editor:"input" },
+        { title:"점수", field:"score", width:90, hozAlign:"left", headerSort:true, editor:"input" },
+      ],
+    });
+
+    // ---------------------------
+    // Ctrl+C 로 "선택영역 복사"를 바로 수행
+    //  - 일부 환경에서 기본 Ctrl+C 동작이 먹지 않는 경우가 있어
+    //    테이블 영역의 keydown을 가로채 명시적으로 호출합니다.
+    // ---------------------------
+    const tableEl = document.getElementById("table");
+
+    // 테이블에 포커스 가능하도록 tabindex="0"을 부여했음
+    // 테이블이 포커스된 상태에서 Ctrl/Cmd + C 를 누르면 선택영역을 복사
+    tableEl.addEventListener("keydown", (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const copyCombo = (isMac && e.metaKey && e.key.toLowerCase() === "c") ||
+                        (!isMac && e.ctrlKey && e.key.toLowerCase() === "c");
+      if (copyCombo) {
+        // 현재 선택된 범위를 클립보드로 복사 (TSV 형태)
+        table.copyToClipboard("selected");
+        // 기본 이벤트를 막아 두 번 처리되는 것을 방지
+        e.preventDefault();
+      }
+    });
+
+    // ---------------------------
+    // 툴바: 검색(실시간 필터) — 선택사항
+    // ---------------------------
+    const $search = document.getElementById("search");
+    $search.addEventListener("input", () => {
+      const query = $search.value.trim();
+      if (!query) {
+        table.clearFilter(); // 검색어 없으면 필터 해제
+      } else {
+        // 이름/도시 컬럼 OR 필터 (부분일치)
+        table.setFilter([
+          [
+            { field:"name", type:"like", value:query },
+            { field:"city", type:"like", value:query },
+          ]
+        ]);
+      }
+    });
+
+    // ---------------------------
+    // 툴바: 행 추가/삭제
+    // ---------------------------
+    document.getElementById("add-row").addEventListener("click", () => {
+      // ✅ 내부키 생성 (충돌 방지를 위해 timestamp+난수 조합)
+      const rid = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+      // ✅ 화면용 id는 빈칸으로 시작 → “이상한 값” 들어가지 않음
+      table.addRow({ _rid: rid, id:"", name:"", age:"", city:"", join:"", score:"" }, true);
+    });
+
+    document.getElementById("del-row").addEventListener("click", () => {
+      const selected = table.getSelectedRows();
+      if (selected.length === 0) {
+        alert("삭제할 행을 선택하세요.");
+        return;
+      }
+      selected.forEach(r => r.delete());
+    });
+
+    // ---------------------------
+    // 툴바: CSV 내보내기
+    // ---------------------------
+    document.getElementById("export-csv").addEventListener("click", () => {
+      table.download("csv", "table-export.csv");
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Tabulator: rowAdded로 _rid 자동생성</title>
+
+  <!-- ✅ Tabulator CSS (최신 버전 불러오기)
+       - 표의 기본 스타일을 적용 -->
+  <link href="https://unpkg.com/tabulator-tables@latest/dist/css/tabulator.min.css" rel="stylesheet">
+
+  <style>
+    /* ✅ 페이지 기본 스타일 */
+    body { 
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; 
+      margin: 24px; 
+    }
+
+    /* 툴바 영역(추가 버튼 등)을 위한 기본 레이아웃 - 현재는 사용 안 함 */
+    .toolbar { 
+      display:flex; 
+      gap:8px; 
+      margin-bottom:12px; 
+      flex-wrap: wrap; 
+    }
+
+    /* ✅ 표 영역 크기 지정 */
+    #table { height: 420px; }
+
+    /* ✅ 버튼 스타일 (추후 추가 버튼 등을 위한 공통 스타일) */
+    button { 
+      padding: 6px 10px; 
+      border:1px solid #ddd; 
+      background:#f7f7f7; 
+      border-radius:6px; 
+      cursor:pointer; 
+    }
+
+    button:hover { background:#eee; }
+  </style>
+</head>
+
+<body>
+
+  <h1>Tabulator Example</h1>
+
+  <!-- ✅ Tabulator가 렌더링될 영역 -->
+  <div id="table" tabindex="0"></div>
+
+  <!-- ✅ Tabulator JS (최신 버전 불러오기)
+       - Tabulator 클래스를 전역에 등록 -->
+  <script src="https://unpkg.com/tabulator-tables@latest/dist/js/tabulator.min.js"></script>
+
+  <script>
+    // ✅ 1. 초기 데이터 정의
+    // 각 행은 객체 형태로, field 이름과 동일한 키를 가짐
+    const tableData = [
+      { name:"홍길동", age:"29", city:"서울",   join:"2024-10-01", score:"83" },
+      { name:"김아름", age:"32", city:"부산",   join:"2023-07-12", score:"91" },
+      { name:"이준호", age:"26", city:"대구",   join:"2025-01-10", score:"75" },
+      { name:"박지민", age:"41", city:"인천",   join:"2022-03-30", score:"88" },
+    ];
+
+    // ✅ 2. Tabulator 테이블 생성
+    const table = new Tabulator("#table", {
+      data: tableData,           // 표시할 초기 데이터
+      layout: "fitColumns",      // 열 너비를 전체 폭에 맞게 자동 조정
+      height: "420px",           // 테이블 높이 지정
+
+      // ✅ 행 선택 기능
+      selectable: true,          // 단일 행 선택
+      selectableRange: true,     // 마우스로 드래그하여 여러 행/셀 범위 선택 가능
+
+      // ✅ 사용자 편의 기능
+      movableColumns: true,      // 열 순서 변경 가능 (드래그)
+      resizableRows: true,       // 행 높이 조정 가능
+
+      // ✅ 클립보드 기능
+      clipboard: true,                // 복사/붙여넣기 활성화 (Ctrl+C / Ctrl+V)
+      clipboardPasteAction: "update", // 붙여넣기 시 기존 셀 값 덮어쓰기
+      clipboardCopyRowRange: "range", // 선택된 셀 범위를 클립보드 대상으로 지정
+      clipboardPasteParser: "range",  // 범위 붙여넣기까지 쓸 거면 함께 권장
+      clipboardCopyConfig: {
+        rowHeaders: false,  // 복사 시 행 번호 포함 여부
+        columnHeaders: false, // 복사 시 열 제목 포함 여부
+      },
+
+
+      // ✅ 셀 수정 방식
+      editTriggerEvent: "dblclick",   // 더블클릭 시 편집 모드 진입
+
+      // ✅ 열 정의
+      columns: [
+        { title:"이름", field:"name", editor:"input" },  // 텍스트 편집 가능
+        { title:"나이", field:"age",  width:90, editor:"input" },
+        { title:"도시", field:"city", editor:"input" },
+        { title:"입사일", field:"join", editor:"input" },
+        { title:"점수", field:"score", width:90, editor:"input" },
+      ],
+    });
+
+    // 🔹 (참고)
+    // 현재 코드는 "rowAdded" 같은 이벤트를 사용하지 않지만,
+    // 추후 table.on("rowAdded", callback) 을 통해 행 추가 시 _rid 등을 자동 생성 가능.
+  </script>
+</body>
+</html>

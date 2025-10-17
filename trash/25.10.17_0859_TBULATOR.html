@@ -1,0 +1,242 @@
+<!--
+
+네, 가능합니다. 핵심은 Ctrl/Cmd + C 키를 누를 때 Tabulator의 copyToClipboard()를 직접 호출해 주는 것입니다.
+버튼 없이도 동작하도록 키보드 핸들러를 추가하면 해결돼요.
+
+아래 코드는
+
+“선택 영역 복사” 버튼을 삭제했고,
+
+Ctrl/Cmd + C 누르면 현재 선택한 셀 범위를 복사합니다.
+
+셀 편집 중(input/textarea)에는 기본 복사를 막지 않도록 분기했습니다.
+
+테이블이 키 이벤트를 안정적으로 받도록 컨테이너에 tabindex="0"을 두고, 마우스로 한 번이라도 클릭하면 포커스를 강제로 주게 했습니다.
+
+(이미 확인하신 대로) HTTPS 또는 http://localhost
+ 같은 보안 컨텍스트에서 테스트하세요.
+
+
+ 전체 코드 (버튼 삭제 + Ctrl/Cmd + C 지원)
+-->
+
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Tabulator 바닐라 예시</title>
+
+  <!-- Tabulator CSS (CDN) -->
+  <link href="https://unpkg.com/tabulator-tables@latest/dist/css/tabulator.min.css" rel="stylesheet">
+
+  <style>
+    /* 데모용 최소 스타일 */
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+    .toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap: wrap; }
+    #table { height: 420px; } /* 고정 높이: 가상 스크롤 활성화 */
+    .note { color:#555; font-size: 13px; margin-top: 8px; }
+    .search { width: 220px; padding: 6px 8px; }
+    button { padding: 6px 10px; border:1px solid #ddd; background:#f7f7f7; border-radius:6px; cursor:pointer; }
+    button:hover { background:#eee; }
+  </style>
+</head>
+<body>
+
+  <h1>Tabulator 바닐라 JS 예시</h1>
+
+  <div class="toolbar">
+    <!-- 검색 입력 -->
+    <input id="search" class="search" type="text" placeholder="이름/도시 검색 (실시간 필터)" />
+
+    <!-- 행 조작 -->
+    <button id="add-row">행 추가</button>
+    <button id="del-row">선택 행 삭제</button>
+
+    <!-- 내보내기 -->
+    <button id="export-csv">CSV 내보내기</button>
+  </div>
+
+  <!-- 테이블 컨테이너
+       tabindex="0"를 주면 div가 포커스를 받을 수 있어 키 이벤트를 쉽게 받습니다. -->
+  <div id="table" tabindex="0"></div>
+  <div class="note">
+    Tip: 마우스로 셀을 드래그해 범위를 선택한 뒤 <b>Ctrl/Cmd + C</b> → 메모장/엑셀에 붙여넣기.
+    (브라우저 보안 정책 때문에 <b>file://</b> 대신 <b>http(s)</b> 환경에서 테스트하세요)
+  </div>
+
+  <!-- Tabulator JS (CDN) -->
+  <script src="https://unpkg.com/tabulator-tables@latest/dist/js/tabulator.min.js"></script>
+
+  <script>
+    // ---------------------------
+    // 데모용 초기 데이터
+    // ---------------------------
+    const tableData = [
+      { id:1, name:"홍길동", age:29, city:"서울", join:"2024-10-01", score: 83 },
+      { id:2, name:"김아름", age:32, city:"부산", join:"2023-07-12", score: 91 },
+      { id:3, name:"이준호", age:26, city:"대구", join:"2025-01-10", score: 75 },
+      { id:4, name:"박지민", age:41, city:"인천", join:"2022-03-30", score: 88 },
+    ];
+
+    // ---------------------------
+    // Tabulator 인스턴스 생성
+    // ---------------------------
+    const table = new Tabulator("#table", {
+      // 기본 데이터/키
+      data: tableData,            // 초기 데이터
+      index: "id",                // 각 행의 고유키(중복X)
+
+      // 레이아웃/행높이
+      layout: "fitColumns",       // 컬럼 너비 자동맞춤
+      height: "420px",            // 가상 스크롤
+      selectable: true,           // 행 선택 가능(행 삭제 등에 사용)
+
+      // 상호작용 기본 옵션
+      movableColumns: true,       // 컬럼 드래그로 순서변경
+      resizableRows: true,        // 행높이 조절
+
+      // ✅ 클립보드 & 범위 선택 (여러 셀 복사용)
+      clipboard: true,                 // Tabulator 클립보드 모듈 활성화
+      clipboardPasteAction: "update",  // 붙여넣기 시 기존 셀 업데이트
+      selectableRange: true,           // 마우스 드래그로 셀 범위 선택
+      selectableRangeMode: "cell",     // 선택 단위를 '셀'로 고정
+      selectableRangeRows: true,       // 행 단위 드래그 허용(선택 편의)
+      selectableRangeColumns: true,    // 컬럼 단위 드래그 허용(선택 편의)
+
+      // (선택) 복사 시 헤더 포함 등 상세 설정
+      clipboardCopyConfig: {
+        columnHeaders: false,   // true면 첫 행에 컬럼헤더 추가
+        rowHeaders: false,
+        columnGroups: false,
+      },
+
+      // 컬럼 정의
+      columns: [
+        { title:"ID", field:"id", width:70, headerSort:true, editor:"input" },
+        { title:"이름", field:"name", width:80, headerSort:true, editor:"input" },
+        { title:"나이", field:"age", width:80, hozAlign:"right", editor:"number",
+          validator:[{ type:"min", parameters:18 }, { type:"max", parameters:120 }],
+        },
+        { title:"도시", field:"city", width:70, headerSort:true, editor:"input" },
+        { title:"입사일", field:"join", width:70, editor:"input",
+          // 간단 날짜 포맷 검증(YYYY-MM-DD)
+          validator: (cell, value) => /^\d{4}-\d{2}-\d{2}$/.test(value) || value === "",
+        },
+        { title:"점수", field:"score", width:90, hozAlign:"right", editor:"number",
+          formatter: (cell) => {
+            // 점수에 따라 라벨링(예: 90이상 우수)
+            const v = Number(cell.getValue());
+            if (Number.isNaN(v)) return "";
+            if (v >= 90) return `⭐ ${v}`;
+            if (v >= 80) return `👍 ${v}`;
+            return `${v}`;
+          },
+        },
+      ],
+    });
+
+    // ---------------------------
+    // (중요) 키보드에서 Ctrl/Cmd + C로 복사
+    // ---------------------------
+    const tableEl = document.getElementById("table");
+
+    // 마우스로 테이블을 한 번이라도 클릭하면 컨테이너가 포커스를 갖게 해서
+    // 키 이벤트를 안정적으로 받도록 합니다.
+    tableEl.addEventListener("mousedown", () => {
+      if (document.activeElement !== tableEl) {
+        tableEl.focus();
+      }
+    });
+
+    // Ctrl/Cmd + C 눌렀을 때, 테이블 안에서 편집 중이 아니라면 Tabulator 복사 실행
+    tableEl.addEventListener("keydown", (ev) => {
+      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const ctrlOrCmd = isMac ? ev.metaKey : ev.ctrlKey;
+
+      // 편집 중(input/textarea/contenteditable)이면 기본 복사 동작을 그대로 두기
+      const t = ev.target;
+      const tag = t && t.tagName ? t.tagName.toLowerCase() : "";
+      const editing = tag === "input" || tag === "textarea" || (t && t.isContentEditable);
+
+      if (ctrlOrCmd && ev.key.toLowerCase() === "c" && !editing) {
+        ev.preventDefault(); // 기본(아무것도 선택되지 않은) 복사 방지
+        try {
+          // ✅ 선택된 '셀 범위' 우선 복사
+          table.copyToClipboard("range");
+        } catch (e) {
+          // ↩ 혹시 버전에 따라 range 미지원/오류 시 행 선택 복사로 폴백
+          table.copyToClipboard("selected");
+        }
+      }
+    });
+
+    // ---------------------------
+    // 툴바: 검색(실시간 필터)
+    // ---------------------------
+    const $search = document.getElementById("search");
+    $search.addEventListener("input", () => {
+      const query = $search.value.trim();
+      if (!query) {
+        table.clearFilter(); // 검색어 없으면 필터 해제
+      } else {
+        // 이름/도시 컬럼 OR 필터 (부분일치)
+        table.setFilter([
+          [
+            { field:"name", type:"like", value:query },
+            { field:"city", type:"like", value:query },
+          ]
+        ]);
+      }
+    });
+
+    // ---------------------------
+    // 툴바: 행 추가/삭제
+    // ---------------------------
+    document.getElementById("add-row").addEventListener("click", () => {
+      const newId = Date.now(); // 간단 유니크 ID
+      table.addRow({ id:newId, name:"", age:null, city:"", join:"", score:null }, true);
+    });
+
+    document.getElementById("del-row").addEventListener("click", () => {
+      const selected = table.getSelectedRows();
+      if (selected.length === 0) {
+        alert("삭제할 행을 선택하세요.");
+        return;
+      }
+      selected.forEach(r => r.delete());
+    });
+
+    // ---------------------------
+    // 툴바: CSV 내보내기
+    // ---------------------------
+    document.getElementById("export-csv").addEventListener("click", () => {
+      table.download("csv", "table-export.csv");
+    });
+
+    // ---------------------------
+    // 셀 편집 콜백(로깅/검증 피드백 예시)
+    // ---------------------------
+    table.on("cellEdited", (cell) => {
+      const field = cell.getField();
+      const value = cell.getValue();
+      if ((field === "age" || field === "score") && value !== null && value !== "" && isNaN(Number(value))) {
+        alert(`'${field}'에는 숫자만 입력하세요.`);
+        cell.restoreOldValue(); // 이전 값으로 되돌림
+      }
+    });
+  </script>
+</body>
+</html>
+
+<!--
+왜 이 방법이 확실한가?
+
+버튼 클릭이 잘 되는 걸 보면, Tabulator의 복사 자체는 정상이고 브라우저 보안·권한도 충족합니다.
+
+문제는 키 입력 시 Tabulator가 자동으로 복사를 트리거해 주지 않는 환경(또는 포커스/편집 상태에 따른 미트리거)이었어요.
+
+그래서 키다운 시점에 직접 table.copyToClipboard('range')를 호출해 주면 버튼과 동일하게 동작합니다.
+
+필요하면 “헤더 포함 복사”(첫 줄에 컬럼명 추가)나 CSV/TSV 포맷 강제 같은 세부 옵션도 더 붙여드릴게요!
+-->

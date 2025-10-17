@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Tabulator 바닐라 예시</title>
+
+  <!-- Tabulator CSS (CDN) -->
+  <!-- latest를 쓰면 항상 최신 버전을 받습니다. 특정 버전을 고정하려면 @6.x 같은 식으로 지정하세요. -->
+  <link href="https://unpkg.com/tabulator-tables@latest/dist/css/tabulator.min.css" rel="stylesheet">
+
+  <style>
+    /* 데모용 최소 스타일 */
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+    .toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap: wrap; }
+    #table { height: 420px; } /* 고정 높이: 가상 스크롤 활성화 */
+    .note { color:#555; font-size: 13px; margin-top: 8px; }
+    .search { width: 220px; padding: 6px 8px; }
+    button { padding: 6px 10px; border:1px solid #ddd; background:#f7f7f7; border-radius:6px; cursor:pointer; }
+    button:hover { background:#eee; }
+  </style>
+</head>
+<body>
+
+  <h1>Tabulator 바닐라 JS 예시</h1>
+
+  <div class="toolbar">
+    <!-- 검색 입력 -->
+    <input id="search" class="search" type="text" placeholder="이름/도시 검색 (실시간 필터)" />
+
+    <!-- 행 조작 -->
+    <button id="add-row">행 추가</button>
+    <button id="del-row">선택 행 삭제</button>
+
+    <!-- 클립보드 제어 -->
+    <button id="copy">선택 영역 복사</button>
+    <button id="paste">붙여넣기 시작(셀 포커스)</button>
+
+    <!-- 내보내기 -->
+    <button id="export-csv">CSV 내보내기</button>
+  </div>
+
+  <!-- 테이블 컨테이너 -->
+  <div id="table"></div>
+  <div class="note">Tip: 엑셀에서 범위를 복사한 뒤, 셀을 한 번 클릭하고 <b>Ctrl+V</b> 하면 붙여넣기 됩니다. (Tabulator Clipboard 모듈)</div>
+
+  <!-- Tabulator JS (CDN) -->
+  <script src="https://unpkg.com/tabulator-tables@latest/dist/js/tabulator.min.js"></script>
+
+  <script>
+    // ---------------------------
+    // 데모용 초기 데이터
+    // ---------------------------
+    const tableData = [
+      { id:1, name:"홍길동", age:29, city:"서울", join:"2024-10-01", score: 83 },
+      { id:2, name:"김아름", age:32, city:"부산", join:"2023-07-12", score: 91 },
+      { id:3, name:"이준호", age:26, city:"대구", join:"2025-01-10", score: 75 },
+      { id:4, name:"박지민", age:41, city:"인천", join:"2022-03-30", score: 88 },
+    ];
+
+    // ---------------------------
+    // Tabulator 인스턴스 생성
+    // ---------------------------
+    const table = new Tabulator("#table", {
+      // 기본 데이터/키
+      data: tableData,                            // 초기 데이터
+      index: "id",                                // 각 행의 고유키(중복X)
+
+      // 레이아웃/행높이
+      layout: "fitColumns",                       // 컬럼 너비 자동맞춤
+      
+
+      height: "420px",                            // 가상 스크롤
+      selectable: true,                           // 행 선택 가능
+
+      // 상호작용 기본 옵션
+      movableColumns: true,                       // 컬럼 드래그로 순서변경
+      resizableRows: true,                        // 행높이 조절
+      clipboard: true,                            // 클립보드(복붙) 활성화
+      clipboardPasteAction: "update",             // 붙여넣기 시 기존 셀 업데이트
+
+      selectableRangeMode: "cell",                // ✅ 여러 셀 드래그 선택 활성화!
+
+      // clipboardPasteParser: 사용자 지정 파서가 필요하면 아래 주석 해제
+      // clipboardPasteParser: (clipboard) => {
+      //   // ✨ 커스텀 파서(예: TSV/CSV 자동 변환 로직 강화)
+      //   // 기본 파서도 엑셀/구글시트 TSV를 잘 처리합니다.
+      //   return clipboard;
+      // },
+
+      // 컬럼 정의
+      columns: [
+        { title:"ID", field:"id", width:70, hozAlign:"right", headerSort:true, editor:false },
+        { title:"이름", field:"name", headerSort:true, editor:"input",
+          // 셀 값 검증: 공백 금지
+          validator: ["required"],
+        },
+        { title:"나이", field:"age", width:80, hozAlign:"right", editor:"number",
+          validator:[{ type:"min", parameters:18 }, { type:"max", parameters:120 }],
+        },
+        { title:"도시", field:"city", editor:"list",
+          editorParams:{
+            // 드롭다운 편집기 옵션
+            values:["서울","부산","인천","대구","대전","광주","울산","세종"],
+            clearable:true,
+          }
+        },
+        { title:"입사일", field:"join", editor:"input",
+          // 간단 날짜 포맷 검증(YYYY-MM-DD)
+          validator: (cell, value) => /^\d{4}-\d{2}-\d{2}$/.test(value) || value === "",
+        },
+        { title:"점수", field:"score", width:90, hozAlign:"right", editor:"number",
+          formatter: (cell) => {
+            // 점수에 따라 라벨링(예: 90이상 우수)
+            const v = Number(cell.getValue());
+            if (Number.isNaN(v)) return "";
+            if (v >= 90) return `⭐ ${v}`;
+            if (v >= 80) return `👍 ${v}`;
+            return `${v}`;
+          },
+        },
+      ],
+
+      // 행 추가 시 기본값 지정(엑셀 붙여넣기와 무관)
+      rowAdded: (row) => {
+        // console.log("row added:", row.getData());
+      },
+    });
+
+    // ---------------------------
+    // 툴바: 검색(실시간 필터)
+    // ---------------------------
+    const $search = document.getElementById("search");
+    $search.addEventListener("input", () => {
+      const query = $search.value.trim();
+      if (!query) {
+        table.clearFilter(); // 검색어 없으면 필터 해제
+      } else {
+        // 이름/도시 컬럼 OR 필터 (부분일치)
+        table.setFilter([
+          [
+            { field:"name", type:"like", value:query },
+            { field:"city", type:"like", value:query },
+          ]
+        ]);
+      }
+    });
+
+    // ---------------------------
+    // 툴바: 행 추가/삭제
+    // ---------------------------
+    document.getElementById("add-row").addEventListener("click", () => {
+      // 새 행 기본값 예시(필요 시 변경)
+      const newId = Date.now(); // 간단 유니크 ID
+      table.addRow({ id:newId, name:"", age:null, city:"", join:"", score:null }, true);
+    });
+
+    document.getElementById("del-row").addEventListener("click", () => {
+      const selected = table.getSelectedRows();
+      if (selected.length === 0) {
+        alert("삭제할 행을 선택하세요.");
+        return;
+      }
+      selected.forEach(r => r.delete());
+    });
+
+    // ---------------------------
+    // 툴바: 클립보드
+    // ---------------------------
+    document.getElementById("copy").addEventListener("click", () => {
+      // 선택 셀/행을 클립보드로 복사
+      table.copyToClipboard("selected");
+      // 전체를 복사하려면: table.copyToClipboard("all");
+    });
+
+    document.getElementById("paste").addEventListener("click", () => {
+      // 붙여넣기 안내: 셀을 한번 클릭한 뒤 Ctrl+V
+      alert("붙여넣기를 하려면 셀을 클릭하고 Ctrl+V를 누르세요.");
+    });
+
+    // ---------------------------
+    // 툴바: CSV 내보내기
+    // ---------------------------
+    document.getElementById("export-csv").addEventListener("click", () => {
+      // 현재 그리드 데이터를 CSV로 다운로드
+      table.download("csv", "table-export.csv");
+      // 참고) XLSX 내보내기는 sheetjs(xlsx) 라이브러리를 추가로 로드해야 합니다.
+    });
+
+    // ---------------------------
+    // 셀 편집 콜백(로깅/검증 피드백 예시)
+    // ---------------------------
+    table.on("cellEdited", (cell) => {
+      const field = cell.getField();
+      const value = cell.getValue();
+      // 예: 나이/점수 숫자 검증 추가 메시지
+      if ((field === "age" || field === "score") && value !== null && value !== "" && isNaN(Number(value))) {
+        alert(`'${field}'에는 숫자만 입력하세요.`);
+        cell.restoreOldValue(); // 이전 값으로 되돌림
+      }
+    });
+  </script>
+</body>
+</html>
