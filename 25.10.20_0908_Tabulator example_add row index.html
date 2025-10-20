@@ -67,6 +67,13 @@
       height: "420px",           // 테이블 높이 지정
 
       // ✅ 행 선택 기능
+      rowHeader: {
+        formatter: "rownum",
+        headerSort: false,
+        hozAlign: "center",
+        resizable: false,
+        frozen: true
+      },
       selectable: true,          // 단일 행 선택
       selectableRange: true,     // 마우스로 드래그하여 여러 행/셀 범위 선택 가능
 
