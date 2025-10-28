@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>AG Grid Community Quick Start (Pure JS)</title>
+
+  <!-- ✅ AG Grid CSS (v31+ 테마: Quartz) -->
+  <link href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-quartz.css" rel="stylesheet">
+
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 20px; }
+    #grid { height: 480px; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .toolbar button { padding: 6px 12px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; }
+    .toolbar button:hover { background: #f6f6f6; }
+  </style>
+</head>
+
+<body>
+  <h2>AG Grid Community (Pure JS)</h2>
+
+  <!-- ✅ 툴바 -->
+  <div class="toolbar">
+    <button id="btnAddRow">행 추가</button>
+    <button id="btnDelSelectedRows">선택 행 삭제</button>
+    <button id="btnClearSel">선택 해제</button>
+    <button id="btnExportCsv">CSV 내보내기</button>
+  </div>
+
+  <!-- ✅ 그리드 컨테이너 -->
+  <div id="grid" class="ag-theme-quartz"></div>
+
+  <!-- ✅ AG Grid JS (Community) -->
+  <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+  <script>
+    // 1) 컬럼 정의
+    const columnDefs = [
+      { headerName: "#", valueGetter: "node.rowIndex + 1", width: 80, pinned: 'left' },
+      { field: "name", headerName: "이름", editable: true },
+      { field: "age", headerName: "나이", editable: true, type: "numericColumn" },
+      { field: "city", headerName: "도시", editable: true },
+      { field: "join", headerName: "입사일", editable: true },
+      { field: "score", headerName: "점수", editable: true, type: "numericColumn" },
+    ];
+
+    // 2) 초기 데이터
+    const rowData = [
+      { name:"홍길동", age:29, city:"서울",   join:"2024-10-01", score:83 },
+      { name:"김아름", age:32, city:"부산",   join:"2023-07-12", score:91 },
+      { name:"이준호", age:26, city:"대구",   join:"2025-01-10", score:75 },
+      { name:"박지민", age:41, city:"인천",   join:"2022-03-30", score:88 },
+    ];
+
+    // 3) Grid 옵션
+    const gridOptions = {
+      columnDefs,
+      rowData,
+
+      // UX
+      defaultColDef: {
+        sortable: true,
+        filter: true,
+        resizable: true,
+        editable: true,
+      },
+
+      // 선택/클립보드
+      rowSelection: 'multiple',         // Ctrl/Shift 로 다중 행 선택
+      suppressRowClickSelection: false, // 셀 클릭으로도 행 선택 허용
+      enableRangeSelection: true,       // 셀 범위 드래그 선택 (Ctrl+C/Ctrl+V)
+      ensureDomOrder: true,             // 범위복사 시 셀 순서 안정화에 도움
+
+      // 편집 UX
+      singleClickEdit: true,
+
+      // 상태바(합계/평균 등) - Community에선 기본 내장 X, 대신 툴바/사용자 계산으로 대체 가능
+      // Enterprise를 쓰면 statusBar 로 바로 합계/평균 표시에 유리합니다.
+
+      onGridReady: (params) => {
+        // 컬럼 사이즈 자동 맞춤
+        params.api.sizeColumnsToFit();
+        // 첫 셀 포커스
+        setTimeout(() => {
+          params.api.setFocusedCell(0, "name");
+        }, 0);
+      },
+    };
+
+    // 4) Grid 생성
+    const gridDiv = document.getElementById('grid');
+    agGrid.createGrid(gridDiv, gridOptions);
+
+    // 5) 툴바 동작
+    document.getElementById('btnAddRow').addEventListener('click', () => {
+      gridOptions.api.applyTransaction({ add: [{ name:"", age:null, city:"", join:"", score:null }] });
+    });
+
+    document.getElementById('btnDelSelectedRows').addEventListener('click', () => {
+      const selected = gridOptions.api.getSelectedRows();
+      if (selected.length) {
+        gridOptions.api.applyTransaction({ remove: selected });
+      }
+    });
+
+    document.getElementById('btnClearSel').addEventListener('click', () => {
+      gridOptions.api.clearRangeSelection();
+      gridOptions.api.deselectAll();
+    });
+
+    document.getElementById('btnExportCsv').addEventListener('click', () => {
+      gridOptions.api.exportDataAsCsv({
+        // fileName: 'export.csv',
+        // columnKeys: ['name','age','city'] // 특정 컬럼만 내보내려면
+      });
+    });
+
+    // 6) Del 키로 "선택된 셀" 비우기 (엑셀처럼)
+    //  - 범위 선택(enableRangeSelection)이 켜져 있어야 합니다.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Delete') {
+        const ranges = gridOptions.api.getCellRanges();
+        if (!ranges || !ranges.length) return;
+
+        const updatesById = new Map();
+        ranges.forEach(range => {
+          const cols = range.columns;
+          const start = Math.min(range.startRow.rowIndex, range.endRow.rowIndex);
+          const end   = Math.max(range.startRow.rowIndex, range.endRow.rowIndex);
+          for (let rowIndex = start; rowIndex <= end; rowIndex++) {
+            const rowNode = gridOptions.api.getDisplayedRowAtIndex(rowIndex);
+            if (!rowNode) continue;
+            let update = updatesById.get(rowNode.id) || { ...rowNode.data };
+            cols.forEach(col => {
+              const field = col.getColDef().field;
+              if (field) update[field] = null;   // 지울 값
+            });
+            updatesById.set(rowNode.id, update);
+          }
+        });
+
+        if (updatesById.size) {
+          gridOptions.api.applyTransaction({ update: Array.from(updatesById.values()) });
+        }
+      }
+    });
+  </script>
+</body>
+</html>

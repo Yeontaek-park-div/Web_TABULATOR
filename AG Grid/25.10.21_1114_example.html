@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>AG Grid — Excel-like (no custom handlers)</title>
+
+  <!-- ✅ AG Grid Community (v34+) 불러오기 -->
+  <link href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-quartz.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+
+  <style>
+    /* ✅ 페이지 전체 스타일 */
+    body { 
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; 
+      margin: 18px; 
+    }
+
+    /* ✅ 그리드 영역 크기 지정 */
+    #grid { height: 520px; }
+
+
+  </style>
+</head>
+<body>
+  <h3>Excel-like preset (옵션만 사용)</h3>
+  <div id="grid" class="ag-theme-quartz"></div>
+
+  <script>
+    /* ✅ 1. 컬럼 정의
+       - 각 필드명(field)은 rowData의 key와 연결됨
+       - editable: true → 셀 편집 가능
+       - type: "numericColumn" → 숫자 정렬, 정렬 아이콘 자동 처리
+    */
+    const columnDefs = [
+      { field: "name",  headerName: "이름",  editable: true },
+      { field: "age",   headerName: "나이",  editable: true, type: "numericColumn" },
+      { field: "city",  headerName: "도시",  editable: true },
+      { field: "join",  headerName: "입사일", editable: true },
+      { field: "score", headerName: "점수",  editable: true, type: "numericColumn" },
+    ];
+
+    /* ✅ 2. 표시할 데이터 정의 */
+    const rowData = [
+      { name:"홍길동", age:29, city:"서울",   join:"2024-10-01", score:83 },
+      { name:"김아름", age:32, city:"부산",   join:"2023-07-12", score:91 },
+      { name:"이준호", age:26, city:"대구",   join:"2025-01-10", score:75 },
+      { name:"박지민", age:41, city:"인천",   join:"2022-03-30", score:88 },
+    ];
+
+    /* ✅ 3. AG Grid 옵션 설정 */
+    const gridOptions = {
+      columnDefs,   // 컬럼 구조 지정
+      rowData,      // 행 데이터 지정
+
+      /* ✅ (1) 셀 선택 기능
+         - 단일 셀 클릭 → 포커스
+         - 드래그 → 다중 셀 선택
+         - Ctrl / Shift 키로 다중 선택 가능
+      */
+      cellSelection: true,              
+
+      /* ✅ (2) 더블클릭으로만 수정 가능
+         - 단일 클릭으로는 편집 모드 진입 불가
+         - Excel과 유사한 UX 유지
+      */
+      suppressClickEdit: true,             
+
+      /* ✅ (3) 행 선택 제어
+         - rowSelection.mode: 다중 행 선택 허용 (Ctrl, Shift)
+         - suppressRowClickSelection: 셀 클릭 시 행 전체 선택 금지
+           (셀 선택과 행 선택이 충돌하지 않게 하기 위함)
+      */
+      rowSelection: { mode: 'multiRow' },  
+      suppressRowClickSelection: true,     
+
+      /* ✅ (4) 헤더 셀 선택 강조
+         - 헤더 클릭 시 해당 컬럼 전체가 시각적으로 하이라이트됨
+      */
+      cellSelection: {
+        enableHeaderHighlight: true        
+      },
+
+      /* ✅ (5) 기본 컬럼 설정
+         - 모든 컬럼에 공통 적용되는 기본 속성
+      */
+      defaultColDef: {
+        sortable: true,    // 정렬 가능
+        filter: true,      // 필터 아이콘 표시
+        resizable: true,   // 드래그로 폭 조절 가능
+        editable: true,    // 기본적으로 편집 가능
+      },
+
+      /* ✅ (6) Excel 유사 키보드 네비게이션 및 편의 기능 */
+      enterNavigatesVertically: true,             // Enter 키로 위/아래 이동
+      enterNavigatesVerticallyAfterEdit: true,    // 편집 후 Enter 시 아래 셀로 이동
+      undoRedoCellEditing: true,                  // Ctrl+Z / Ctrl+Y 되돌리기 지원
+      undoRedoCellEditingLimit: 50,               // 최대 50단계까지 기록
+
+      /* ✅ (7) 초기 렌더링 후 자동 컬럼 폭 조정
+         - 데이터 로드 후 테이블 폭에 맞게 자동 맞춤
+      */
+      onFirstDataRendered: p => p.api.sizeColumnsToFit(),
+    };
+
+    /* ✅ 4. AG Grid 생성
+       - HTML 요소 #grid를 타깃으로 그리드 인스턴스 생성
+    */
+    agGrid.createGrid(document.getElementById('grid'), gridOptions);
+  </script>
+</body>
+</html>
